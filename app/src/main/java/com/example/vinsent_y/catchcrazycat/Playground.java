@@ -5,20 +5,20 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.View.OnTouchListener;
 
-public class Playground extends SurfaceView implements View.OnTouchListener{
+public class Playground extends SurfaceView implements OnTouchListener{
 
     private int WIDTH = 40;
     private int COL = 9;
     private int ROW = 9;
     private int BLOCK = 10;
 
-    private int verY = 0;
+    private int offsetY = 200;
 
     private Dot[][] matrix;
 
@@ -28,7 +28,7 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
         super(context);
         getHolder().addCallback(callback);
         matrix = new Dot[ROW][COL];
-
+        setOnTouchListener(this);
         initGame();
     }
 
@@ -57,8 +57,8 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    canvas.drawOval(temp.getCol() * WIDTH + offset, temp.getRow() * WIDTH,
-                            (temp.getCol() + 1) * WIDTH + offset, (temp.getRow() + 1) * WIDTH, paint);
+                    canvas.drawOval(temp.getCol() * WIDTH + offset, temp.getRow() * WIDTH + offsetY,
+                            (temp.getCol() + 1) * WIDTH + offset, (temp.getRow() + 1) * WIDTH + offsetY, paint);
                 }
 
 
@@ -78,6 +78,7 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
         @Override
         public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
             WIDTH = (int) (i1/(COL + 0.5));
+            offsetY = i2 - ROW * WIDTH - WIDTH / 2;
             redraw();
         }
 
@@ -86,6 +87,25 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
 
         }
     };
+
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        if(motionEvent.getAction() == MotionEvent.ACTION_UP) {
+            int x = (int) motionEvent.getX();
+            int y = (int) motionEvent.getY();
+
+            Dot touchDot = getTouchedDot(x,y);
+
+            if (touchDot == null) {
+                initGame();
+            } else if(touchDot.getStatus() == Dot.STATUS_EMPTY) {
+                touchDot.setStatus(Dot.STATUS_BLOCK);
+            }
+            redraw();
+
+        }
+        return true;
+    }
 
     private void initGame() {
         for (int i = 0; i < ROW; i++) {
@@ -96,7 +116,7 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
         }
         cat = new Dot(4, 4);
         cat.setStatus(Dot.STATUS_CAT);
-        matrix[4][5] = cat;
+        matrix[4][4] = cat;
         for (int i = 0; i <= BLOCK; ) {
             int row = (int) ((Math.random() * 1000) % ROW);
             int col = (int) ((Math.random() * 1000) % COL);
@@ -107,11 +127,22 @@ public class Playground extends SurfaceView implements View.OnTouchListener{
         }
     }
 
-    @Override
-    public boolean onTouch(View view, MotionEvent motionEvent) {
-        if(motionEvent.getAction() == MotionEvent.ACTION_UP) {
-
+    private Dot getTouchedDot(int x, int y) {
+        y = y - offsetY;
+        int col;
+        int row = y / WIDTH;
+        if(row % 2 != 0) {
+            col = (x - WIDTH/2)/WIDTH;
+        } else {
+            col = x/WIDTH;
         }
-        return false;
+
+        if ( col + 1 > COL || row + 1 > ROW) {
+            return null;
+        } else {
+            return matrix[row][col];
+        }
     }
+
+
 }
