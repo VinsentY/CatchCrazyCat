@@ -1,21 +1,21 @@
 package com.example.vinsent_y.catchcrazycat;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnTouchListener;
-import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -52,6 +52,11 @@ public class Playground extends SurfaceView implements OnTouchListener{
 
     private int[] images = new int[IMAGE_NUM];
 
+    // 行走步数
+    private int steps;
+
+    private boolean canMove = true;
+
     public Playground(Context context) {
         super(context);
         getHolder().addCallback(callback);
@@ -62,6 +67,10 @@ public class Playground extends SurfaceView implements OnTouchListener{
     }
 
     private void loadRec() {
+
+        cat_drawable = getResources().getDrawable(R.drawable.cat1);
+
+
         images[0] = R.drawable.cat1;
         images[1] = R.drawable.cat2;
         images[2] = R.drawable.cat3;
@@ -92,32 +101,44 @@ public class Playground extends SurfaceView implements OnTouchListener{
             if (i % 2 != 0) {
                 offset = WIDTH / 2;
             }
+
             for (int j = 0; j < COL; j++) {
                 Dot temp = matrix[i][j];
                 switch (temp.getStatus()) {
                     case Dot.STATUS_EMPTY:
-                        paint.setColor(0xFFEEEEEE);
+                        paint.setColor(Color.WHITE);
                         break;
                     case Dot.STATUS_BLOCK:
                         paint.setColor(0xFFFFAA00);
                         break;
                     case Dot.STATUS_CAT:
-                        paint.setColor(0xFFFF0000);
+                        paint.setColor(Color.RED);
                         break;
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     canvas.drawOval(temp.getCol() * WIDTH + offset, temp.getRow() * WIDTH + offsetY,
                             (temp.getCol() + 1) * WIDTH + offset, (temp.getRow() + 1) * WIDTH + offsetY, paint);
+
                 }
 
 
             }
         }
 
-//        cat_drawable.setBounds(left - WIDTH / 6 + length, top - WIDTH / 2
-//                + offsetY, left + WIDTH + length, top + WIDTH + offsetY);
-//        cat_drawable.draw(canvas);
+        int left = 0;
+        int top = 0;
+        if (cat.getRow() % 2 == 0) {
+            left = cat.getCol() * WIDTH;
+            top = cat.getRow() * WIDTH;
+        } else {
+            left = (int) (WIDTH / 2) + cat.getCol() * WIDTH;
+            top = cat.getRow() * WIDTH;
+        }
+        // 此处神经猫图片的位置是根据效果图来调整的
+        cat_drawable.setBounds(left - WIDTH / 6, top - WIDTH / 2
+                + offsetY - WIDTH / 3, left + WIDTH, top + WIDTH + offsetY - WIDTH / 3);
+        cat_drawable.draw(canvas);
 
         background.setBounds(0, 0, SCREEN_WIDTH, offsetY);
         background.draw(canvas);
@@ -129,8 +150,8 @@ public class Playground extends SurfaceView implements OnTouchListener{
         @Override
         public void surfaceCreated(SurfaceHolder surfaceHolder) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                redraw();
                 startTimer();
+                redraw();
             }
         }
 
@@ -157,15 +178,16 @@ public class Playground extends SurfaceView implements OnTouchListener{
             Dot touchDot = getTouchedDot(x,y);
 
             if (touchDot == null) {
-//                initGame();
-                for (int i = 0; i < 6; i++) {
-                    Log.d(TAG, "Position: " + ( i + 1)  + " @ " + getDistance(cat, i) + '\n');
-                    Log.d(TAG, "Neighbour: " + ( i + 1)  + " @ " + getNeighbour(cat, i).getRow() + " " + getNeighbour(cat, i).getCol() + '\n');
-                    //getDistance无问题.
-                    //getNeighbour无问题
-                }
-            } else if(touchDot.getStatus() == Dot.STATUS_EMPTY) {
+////                initGame();
+//                for (int i = 0; i < 6; i++) {
+//                    Log.d(TAG, "Position: " + ( i + 1)  + " @ " + getDistance(cat, i) + '\n');
+//                    Log.d(TAG, "Neighbour: " + ( i + 1)  + " @ " + getNeighbour(cat, i).getRow() + " " + getNeighbour(cat, i).getCol() + '\n');
+//                    //getDistance无问题.
+//                    //getNeighbour无问题
+//                }
+            } else if(canMove == true && touchDot.getStatus() == Dot.STATUS_EMPTY) {
                 touchDot.setStatus(Dot.STATUS_BLOCK);
+                steps++;
                 catMove(bestPosition());
             }
             redraw();
@@ -175,6 +197,8 @@ public class Playground extends SurfaceView implements OnTouchListener{
     }
 
     private void initGame() {
+        steps = 0;
+
         for (int i = 0; i < ROW; i++) {
             for (int j = 0; j < COL; j++) {
                 matrix[i][j] = new Dot(i,j);
@@ -362,27 +386,50 @@ public class Playground extends SurfaceView implements OnTouchListener{
         }
 
         Dot newCat = getNeighbour(cat, position);
-        if (isAtEdge(newCat)) {
-            lose();
-            return;
-        }
         newCat.setStatus(Dot.STATUS_CAT);
         cat.setStatus(Dot.STATUS_EMPTY);
         cat = newCat;
 
 
+        if (isAtEdge(newCat)) {
+            lose();
+            return;
+        }
+
     }
 
     private void lose() {
-        Toast.makeText(getContext(),"You Haven't Catch the Crazy Cat!", Toast.LENGTH_SHORT).show();
-
-        initGame();
+        canMove = false;
+        redraw();
+        AlertDialog.Builder dialog = new AlertDialog.Builder(getContext());
+        dialog.setTitle("通关失败");
+        dialog.setMessage("你让神经猫逃出精神院啦(ˉ▽ˉ；)...");
+        dialog.setCancelable(false);
+        dialog.setNegativeButton("再玩一次", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                initGame();
+                canMove = true;
+            }
+        });
+        dialog.setPositiveButton("取消", null);
+        dialog.show();
     }
 
+    // 通关成功
     private void win() {
-        Toast.makeText(getContext(),"You Catch the Crazy Cat!", Toast.LENGTH_SHORT).show();
-
-        initGame();
+        canMove = false;
+        AlertDialog.Builder dialog = new AlertDialog.Builder(getContext());
+        dialog.setTitle("通关成功");
+        dialog.setMessage("你用" + (steps + 1) + "步捕捉到了神经猫耶( •̀ ω •́ )y");
+        dialog.setCancelable(false);
+        dialog.setNegativeButton("再玩一次", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                initGame();
+                canMove = true;
+            }
+        });
+        dialog.setPositiveButton("取消", null);
+        dialog.show();
     }
 
     // 开启定时任务
